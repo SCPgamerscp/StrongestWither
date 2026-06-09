@@ -32,23 +32,7 @@ public class WitherEventHandler {
     public void onEntityJoinLevel(EntityJoinLevelEvent event) {
         if (event.getEntity() instanceof WitherBoss wither) {
             if (!event.getLevel().isClientSide()) {
-                // Modify HP: vanilla is 300, we want 1000, so add 700
-                AttributeInstance healthAttr = wither.getAttribute(Attributes.MAX_HEALTH);
-                if (healthAttr != null && healthAttr.getModifier(HEALTH_MODIFIER_UUID) == null) {
-                    healthAttr.addPermanentModifier(new AttributeModifier(
-                            HEALTH_MODIFIER_UUID, HEALTH_MODIFIER_NAME, 700.0,
-                            AttributeModifier.Operation.ADDITION));
-                    // Heal to full after modifying max health
-                    wither.setHealth(wither.getMaxHealth());
-                }
-
-                // Modify Armor: vanilla is 0, we want 20
-                AttributeInstance armorAttr = wither.getAttribute(Attributes.ARMOR);
-                if (armorAttr != null && armorAttr.getModifier(ARMOR_MODIFIER_UUID) == null) {
-                    armorAttr.addPermanentModifier(new AttributeModifier(
-                            ARMOR_MODIFIER_UUID, ARMOR_MODIFIER_NAME, 20.0,
-                            AttributeModifier.Operation.ADDITION));
-                }
+                applyEnhancedAttributes(wither);
 
                 // Add enhanced attack goal (check if not already added by using a tag)
                 boolean hasEnhancedGoal = wither.getTags().contains("enhanced_wither");
@@ -62,16 +46,35 @@ public class WitherEventHandler {
         }
     }
 
+    public static void applyEnhancedAttributes(WitherBoss wither) {
+        // Modify HP: vanilla is 300, we want 1000, so add 700
+        AttributeInstance healthAttr = wither.getAttribute(Attributes.MAX_HEALTH);
+        if (healthAttr != null && healthAttr.getModifier(HEALTH_MODIFIER_UUID) == null) {
+            healthAttr.addPermanentModifier(new AttributeModifier(
+                    HEALTH_MODIFIER_UUID, HEALTH_MODIFIER_NAME, 700.0,
+                    AttributeModifier.Operation.ADDITION));
+            // Heal to full after modifying max health
+            wither.setHealth(wither.getMaxHealth());
+        }
+
+        // Modify Armor: vanilla is 0, we want 20
+        AttributeInstance armorAttr = wither.getAttribute(Attributes.ARMOR);
+        if (armorAttr != null && armorAttr.getModifier(ARMOR_MODIFIER_UUID) == null) {
+            armorAttr.addPermanentModifier(new AttributeModifier(
+                    ARMOR_MODIFIER_UUID, ARMOR_MODIFIER_NAME, 20.0,
+                    AttributeModifier.Operation.ADDITION));
+        }
+    }
+
     /**
      * Intercept wither skull impacts to handle explosive skulls tagged with "enhanced_explosive".
      * Intercept potion impacts to handle giant potions tagged with "enhanced_giant_potion".
      */
-    @SuppressWarnings("removal")
     @SubscribeEvent
     public void onProjectileImpact(ProjectileImpactEvent event) {
         if (event.getProjectile() instanceof net.minecraft.world.entity.projectile.ThrownPotion potion) {
             if (potion.getTags().contains(GIANT_POTION_TAG) && !potion.level().isClientSide()) {
-                event.setCanceled(true);
+                event.setImpactResult(ProjectileImpactEvent.ImpactResult.STOP_AT_CURRENT_NO_DAMAGE);
                 
                 net.minecraft.world.entity.AreaEffectCloud cloud = new net.minecraft.world.entity.AreaEffectCloud(
                         potion.level(), potion.getX(), potion.getY(), potion.getZ());
@@ -97,7 +100,7 @@ public class WitherEventHandler {
         if (event.getProjectile() instanceof WitherSkull skull) {
             if (skull.getTags().contains(EXPLOSIVE_SKULL_TAG) && !skull.level().isClientSide()) {
                 // Cancel the default impact behavior
-                event.setCanceled(true);
+                event.setImpactResult(ProjectileImpactEvent.ImpactResult.STOP_AT_CURRENT_NO_DAMAGE);
 
                 // Determine if this should break blocks
                 boolean canBreakBlocks = skull.isDangerous() ||

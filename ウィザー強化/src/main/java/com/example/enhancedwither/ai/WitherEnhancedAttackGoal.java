@@ -8,7 +8,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.projectile.ThrownPotion;
 import net.minecraft.world.entity.projectile.WitherSkull;
@@ -21,18 +20,20 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Random;
+import java.security.SecureRandom;
 
 public class WitherEnhancedAttackGoal extends Goal {
 
     private final WitherBoss wither;
-    private final Random random = new Random();
+    private final SecureRandom random = new SecureRandom();
 
     // Attack state
     private AttackType currentAttack = null;
     private int attackTicksRemaining = 0;
     private int cooldownTicks = 0;
     private boolean useBlueSkull = false;
+    private LivingEntity cachedTarget = null;
+    private int targetSearchCooldown = 0;
 
     // Timing constants
     private static final int BARRAGE_DURATION_TICKS = 200; // 10 seconds
@@ -114,6 +115,12 @@ public class WitherEnhancedAttackGoal extends Goal {
             return witherTarget;
         }
 
+        if (cachedTarget != null && cachedTarget.isAlive() && targetSearchCooldown > 0) {
+            targetSearchCooldown--;
+            return cachedTarget;
+        }
+        targetSearchCooldown = 40; // Cache for 40 ticks
+
         // Fallback: find nearest living entity within 100 blocks
         Level level = wither.level();
         List<LivingEntity> entities = level.getEntitiesOfClass(
@@ -131,6 +138,7 @@ public class WitherEnhancedAttackGoal extends Goal {
                 closest = e;
             }
         }
+        cachedTarget = closest;
         return closest;
     }
 
@@ -273,6 +281,11 @@ public class WitherEnhancedAttackGoal extends Goal {
     private void strikeLightning(LivingEntity target) {
         if (!(wither.level() instanceof ServerLevel serverLevel)) return;
 
+        // Pre-fetch entities in the general area to avoid repeated AABB searches in the loop
+        List<LivingEntity> potentialTargets = serverLevel.getEntitiesOfClass(
+                LivingEntity.class, target.getBoundingBox().inflate(10.0),
+                e -> e != wither && e.isAlive());
+
         // Strike 5 lightning bolts around the target
         for (int i = 0; i < 5; i++) {
             double offsetX = (random.nextDouble() - 0.5) * 6.0;
@@ -283,11 +296,11 @@ public class WitherEnhancedAttackGoal extends Goal {
                 serverLevel.addFreshEntity(lightning);
 
                 // Manually deal Wither-attributed damage around the strike (Lightning doesn't attribute to mobs)
-                List<LivingEntity> hitEntities = serverLevel.getEntitiesOfClass(
-                        LivingEntity.class, lightning.getBoundingBox().inflate(3.0),
-                        e -> e != wither && e.isAlive());
-                for (LivingEntity e : hitEntities) {
-                    e.hurt(wither.damageSources().mobAttack(wither), 5.0F);
+                net.minecraft.world.phys.AABB lightningBox = lightning.getBoundingBox().inflate(3.0);
+                for (LivingEntity e : potentialTargets) {
+                    if (e.getBoundingBox().intersects(lightningBox)) {
+                        e.hurt(wither.damageSources().mobAttack(wither), 5.0F);
+                    }
                 }
             }
         }
@@ -342,16 +355,10 @@ public class WitherEnhancedAttackGoal extends Goal {
 
     // ========== UTILITY METHODS ==========
     private void shootSkullAt(LivingEntity target, boolean dangerous) {
-        if (!(wither.level() instanceof ServerLevel serverLevel)) return;
-
         double dx = target.getX() - wither.getX();
         double dy = target.getY(0.5) - wither.getY(0.5);
         double dz = target.getZ() - wither.getZ();
-
-        WitherSkull skull = new WitherSkull(serverLevel, wither, dx, dy, dz);
-        skull.setPos(wither.getX(), wither.getY() + 3.0, wither.getZ());
-        skull.setDangerous(dangerous);
-        serverLevel.addFreshEntity(skull);
+        shootSkullInDirection(dx, dy, dz, dangerous);
     }
 
     private void shootSkullInDirection(double dx, double dy, double dz, boolean dangerous) {
