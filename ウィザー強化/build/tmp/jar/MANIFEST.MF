@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Specification-Title: enhancedwither
+Specification-Vendor: EnhancedWither Dev
+Specification-Version: 1
+Implementation-Title: ウィザー強化
+Implementation-Version: 1.0.0
+Implementation-Vendor: EnhancedWither Dev
+Implementation-Timestamp: 2026-06-07T15:36:31+0900
+
