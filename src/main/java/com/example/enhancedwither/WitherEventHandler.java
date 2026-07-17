@@ -150,29 +150,43 @@ public class WitherEventHandler {
 
     /**
      * Add bonus drops when the enhanced wither is killed:
-     * 320 diamond blocks + 6 nether stars (in addition to vanilla's 1 nether star).
+     * Base: 320 diamond blocks + 6 nether stars (in addition to vanilla's 1 nether star).
+     * Looting: +100% per level (Looting III = 4x multiplier).
      */
     @SubscribeEvent
     public void onLivingDrops(net.minecraftforge.event.entity.living.LivingDropsEvent event) {
         if (event.getEntity() instanceof WitherBoss wither) {
             if (wither.getTags().contains("enhanced_wither") && !wither.level().isClientSide()) {
-                // Drop 320 diamond blocks (5 stacks of 64)
-                for (int i = 0; i < 5; i++) {
+                int lootingLevel = event.getLootingLevel();
+                // Multiplier: 1 + lootingLevel (Looting 0=1x, I=2x, II=3x, III=4x)
+                int multiplier = 1 + lootingLevel;
+
+                int totalDiamondBlocks = 320 * multiplier;
+                int totalNetherStars = 6 * multiplier;
+
+                // Drop diamond blocks in stacks of 64
+                while (totalDiamondBlocks > 0) {
+                    int stackSize = Math.min(totalDiamondBlocks, 64);
                     net.minecraft.world.item.ItemStack diamondBlocks = new net.minecraft.world.item.ItemStack(
-                            net.minecraft.world.item.Items.DIAMOND_BLOCK, 64);
+                            net.minecraft.world.item.Items.DIAMOND_BLOCK, stackSize);
                     net.minecraft.world.entity.item.ItemEntity diamondDrop = new net.minecraft.world.entity.item.ItemEntity(
                             wither.level(), wither.getX(), wither.getY(), wither.getZ(), diamondBlocks);
                     diamondDrop.setDefaultPickUpDelay();
                     event.getDrops().add(diamondDrop);
+                    totalDiamondBlocks -= stackSize;
                 }
 
-                // Drop 6 nether stars
-                net.minecraft.world.item.ItemStack netherStars = new net.minecraft.world.item.ItemStack(
-                        net.minecraft.world.item.Items.NETHER_STAR, 6);
-                net.minecraft.world.entity.item.ItemEntity starDrop = new net.minecraft.world.entity.item.ItemEntity(
-                        wither.level(), wither.getX(), wither.getY(), wither.getZ(), netherStars);
-                starDrop.setDefaultPickUpDelay();
-                event.getDrops().add(starDrop);
+                // Drop nether stars in stacks of 64
+                while (totalNetherStars > 0) {
+                    int stackSize = Math.min(totalNetherStars, 64);
+                    net.minecraft.world.item.ItemStack netherStars = new net.minecraft.world.item.ItemStack(
+                            net.minecraft.world.item.Items.NETHER_STAR, stackSize);
+                    net.minecraft.world.entity.item.ItemEntity starDrop = new net.minecraft.world.entity.item.ItemEntity(
+                            wither.level(), wither.getX(), wither.getY(), wither.getZ(), netherStars);
+                    starDrop.setDefaultPickUpDelay();
+                    event.getDrops().add(starDrop);
+                    totalNetherStars -= stackSize;
+                }
             }
         }
     }
