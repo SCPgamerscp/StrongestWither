@@ -15,6 +15,6 @@ public class EnhancedWitherMod {
     public EnhancedWitherMod() {
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, EnhancedWitherConfig.SPEC);
         MinecraftForge.EVENT_BUS.register(new WitherEventHandler());
-        LOGGER.info("Enhanced Wither Mod loaded! The Wither is now terrifying.");
+        LOGGER.info("Strongest Wither loaded! The Wither is now terrifying.");
     }
 }
